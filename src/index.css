@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-100/70 text-slate-900 antialiased min-h-screen font-sans;
+  }
+}
+
+/* Print Specific Styles for Professional Legal Contracts */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+  }
+
+  #legal-disclaimer-banner,
+  #main-app-header,
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  #document-editor-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  textarea {
+    border: none !important;
+    resize: none !important;
+    padding: 0 !important;
+  }
+}

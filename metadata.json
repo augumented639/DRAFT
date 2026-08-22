@@ -1,0 +1,6 @@
+{
+  "name": "JurisDraft AI - Legal Document Drafting & Planning",
+  "description": "AI-powered legal draft planner and document generator that translates natural-language requirements into customized, structured legal agreements with intelligent interviews, draft planning, risk reviews, and multi-format export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
