@@ -1,4 +1,12 @@
 import { AppSettings } from '../types';
+import {
+  getFallbackRecommendations,
+  getFallbackClarificationQuestions,
+  getFallbackDraftPlan,
+  getFallbackFullDocument,
+  getFallbackLegalReview,
+  getFallbackClauseAssistant
+} from './fallbackGenerator';
 
 function getHeaders(settings?: AppSettings) {
   const headers: Record<string, string> = {
@@ -16,6 +24,7 @@ function getHeaders(settings?: AppSettings) {
 export async function checkServerHealth() {
   try {
     const res = await fetch('/api/health');
+    if (!res.ok) throw new Error('Health check non-200');
     return await res.json();
   } catch (e) {
     return { status: 'offline', hasOpenRouter: false, hasGemini: false };
@@ -23,13 +32,27 @@ export async function checkServerHealth() {
 }
 
 export async function fetchDocumentRecommendations(description: string, jurisdiction: string, settings?: AppSettings) {
-  const res = await fetch('/api/ai/recommend-document', {
-    method: 'POST',
-    headers: getHeaders(settings),
-    body: JSON.stringify({ description, jurisdiction })
-  });
-  if (!res.ok) throw new Error('Failed to fetch recommendations');
-  return await res.json();
+  try {
+    const res = await fetch('/api/ai/recommend-document', {
+      method: 'POST',
+      headers: getHeaders(settings),
+      body: JSON.stringify({ description, jurisdiction })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.recommendations && data.recommendations.length > 0) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend recommendation fetch failed, using built-in legal engine:', err);
+  }
+
+  // Resilient fallback
+  return {
+    recommendations: getFallbackRecommendations(description, jurisdiction),
+    disclaimer: 'This recommendation is for informational guidance only and does not constitute formal legal counsel.'
+  };
 }
 
 export async function fetchClarificationQuestions(
@@ -39,13 +62,24 @@ export async function fetchClarificationQuestions(
   existingAnswers: Record<string, any> = {},
   settings?: AppSettings
 ) {
-  const res = await fetch('/api/ai/clarify-questions', {
-    method: 'POST',
-    headers: getHeaders(settings),
-    body: JSON.stringify({ documentType, rawRequirements, jurisdiction, existingAnswers })
-  });
-  if (!res.ok) throw new Error('Failed to generate clarification questions');
-  return await res.json();
+  try {
+    const res = await fetch('/api/ai/clarify-questions', {
+      method: 'POST',
+      headers: getHeaders(settings),
+      body: JSON.stringify({ documentType, rawRequirements, jurisdiction, existingAnswers })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.questions && data.questions.length > 0) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend clarify questions fetch failed, using built-in legal engine:', err);
+  }
+
+  // Resilient fallback
+  return getFallbackClarificationQuestions(documentType, rawRequirements, jurisdiction);
 }
 
 export async function fetchDraftPlan(
@@ -55,13 +89,24 @@ export async function fetchDraftPlan(
   answers: Record<string, any>,
   settings?: AppSettings
 ) {
-  const res = await fetch('/api/ai/generate-plan', {
-    method: 'POST',
-    headers: getHeaders(settings),
-    body: JSON.stringify({ documentType, rawRequirements, jurisdiction, answers })
-  });
-  if (!res.ok) throw new Error('Failed to generate draft plan');
-  return await res.json();
+  try {
+    const res = await fetch('/api/ai/generate-plan', {
+      method: 'POST',
+      headers: getHeaders(settings),
+      body: JSON.stringify({ documentType, rawRequirements, jurisdiction, answers })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.documentTitle) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend draft plan fetch failed, using built-in legal engine:', err);
+  }
+
+  // Resilient fallback
+  return getFallbackDraftPlan(documentType, rawRequirements, jurisdiction, answers);
 }
 
 export async function fetchFullDocument(
@@ -72,13 +117,24 @@ export async function fetchFullDocument(
   draftPlan: any,
   settings?: AppSettings
 ) {
-  const res = await fetch('/api/ai/generate-document', {
-    method: 'POST',
-    headers: getHeaders(settings),
-    body: JSON.stringify({ documentType, rawRequirements, jurisdiction, answers, draftPlan })
-  });
-  if (!res.ok) throw new Error('Failed to generate legal document');
-  return await res.json();
+  try {
+    const res = await fetch('/api/ai/generate-document', {
+      method: 'POST',
+      headers: getHeaders(settings),
+      body: JSON.stringify({ documentType, rawRequirements, jurisdiction, answers, draftPlan })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.sections && data.sections.length > 0) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend full document fetch failed, using built-in legal engine:', err);
+  }
+
+  // Resilient fallback
+  return getFallbackFullDocument(documentType, rawRequirements, jurisdiction, answers, draftPlan);
 }
 
 export async function fetchLegalReview(
@@ -88,13 +144,24 @@ export async function fetchLegalReview(
   draftPlan: any,
   settings?: AppSettings
 ) {
-  const res = await fetch('/api/ai/legal-review', {
-    method: 'POST',
-    headers: getHeaders(settings),
-    body: JSON.stringify({ documentText, documentType, jurisdiction, draftPlan })
-  });
-  if (!res.ok) throw new Error('Failed to run legal review');
-  return await res.json();
+  try {
+    const res = await fetch('/api/ai/legal-review', {
+      method: 'POST',
+      headers: getHeaders(settings),
+      body: JSON.stringify({ documentText, documentType, jurisdiction, draftPlan })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.items && data.items.length > 0) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend legal review fetch failed, using built-in legal engine:', err);
+  }
+
+  // Resilient fallback
+  return getFallbackLegalReview(documentText, documentType, jurisdiction, draftPlan);
 }
 
 export async function callClauseAssistant(
@@ -105,11 +172,23 @@ export async function callClauseAssistant(
   jurisdiction?: string,
   settings?: AppSettings
 ) {
-  const res = await fetch('/api/ai/clause-assistant', {
-    method: 'POST',
-    headers: getHeaders(settings),
-    body: JSON.stringify({ action, clauseText, heading, instruction, jurisdiction })
-  });
-  if (!res.ok) throw new Error('Failed to run clause assistant');
-  return await res.json();
+  try {
+    const res = await fetch('/api/ai/clause-assistant', {
+      method: 'POST',
+      headers: getHeaders(settings),
+      body: JSON.stringify({ action, clauseText, heading, instruction, jurisdiction })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && (data.revisedText || data.explanation)) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend clause assistant fetch failed, using built-in legal engine:', err);
+  }
+
+  // Resilient fallback
+  return getFallbackClauseAssistant(action, clauseText, heading, instruction);
 }
+
